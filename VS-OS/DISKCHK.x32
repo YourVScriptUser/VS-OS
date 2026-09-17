@@ -1,0 +1,3 @@
+origin 0x00050000 ; Program that checks the disk
+db 0xCA, 0xFE
+

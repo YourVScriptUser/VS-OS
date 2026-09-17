@@ -1,0 +1,88 @@
+origin 0x00040000 ; SHELL.BIN loads this file at this address
+; Main file runner command
+; All programs that run must have a origin of 0x00050000
+
+ldi r0, header
+ldi r1, 1
+call sys_kprint
+
+; Skip over 'run ' text to reach the filename
+ldi r0, SHELL_CURRENT_COMMAND
+add r0, 4 ; 'run ', 4 total chars
+
+; .APP Files must start with CA, FE
+
+
+
+ldi r1, load_addr
+ldi r2, 0
+copy r16, r0
+call sys_loadfile
+
+cmp r0, 1
+je not_found
+
+ldi r0, load_addr
+
+rb r1, [r0]
+cmp r1, 0xCA
+jne op_np
+
+add r0, 1 
+
+rb r1, [r0]
+cmp r1, 0xFE
+jne op_np
+
+; FIX: Skip over CA, FE
+ldi r0, load_addr
+add r0, 2
+push .return_done ; push return address
+jmp r0
+
+.return_done:
+call cleanup
+clf
+ret
+
+cleanup:
+  ldi r0, load_addr
+  ldi r1, load_addr
+  add r1, 4096
+
+cleanup.loop:
+  ldi r2, 0
+  wb [r0], r2
+  cmp r0, r1
+  je cleanup.done
+  add r0, 1
+  jmp cleanup.loop
+
+cleanup.done:
+  clf
+  ret
+
+not_found:
+  ldi r0, msg_not_found
+  ldi r1, 1
+  copy r2, r16
+  call sys_kprintEx 
+  clf 
+  ret
+
+op_np:
+  ldi r0, bad_file
+  ldi r1, 1
+  copy r2, r16
+  call sys_kprintEx
+  clf
+  ret
+  
+
+bad_file:       db "ERROR: The file '~' is not executable", 0
+msg_not_found:  db "ERROR: File not found: '~'", 0
+header:         db "VS-OS RUN.BIN Version 1.1\n", 0
+
+origin 0
+region 0x00050000
+load_addr:

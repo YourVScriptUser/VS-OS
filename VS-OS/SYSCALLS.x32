@@ -1,0 +1,879 @@
+origin 0x00020000 ; KERNEL.x32 Loads this file at this address
+
+; BIOS Interrupts:
+;  BIOS Interrupt IVT ID reserved: 5-20
+;  ID * 4 = dword address of vector
+; ABI:
+;  ( ID: Explanation )
+
+;  14: Teletype               (0x0E)
+;      r0: ASCII Letter to print
+
+;   5: Disk read              (0x05)
+;      r0: Sector
+;      r1: Address
+
+;   6: Disk write             (0x06)
+
+;  10: Clear Keyboard Buffer  (0x0A)
+
+; Prints debug info and kills the kernel
+; For non-fixable errors only
+; Expects these routines to be in a working state:
+;  hex_r0           | TEXT.BIN Must be loaded
+;  sys_kprint 
+;  sys_newline
+;  sys_space
+;  SYMBOLS.SYM Must be loaded
+; r0 = Error Code       ( Set by emulator )
+; r1 = Faulting IP      ( Set by emulator )
+sys_kernel_panic: 
+  copy r20, r1
+  ; Push these values to the stack 
+  push r1
+  push r0
+  ldi r0, MSG_KERNEL_PANIC
+  ldi r1, 1
+  call sys_kprint
+  
+  ldi r0, MSG_ERROR_CODE
+  ldi r1, 0
+  call sys_kprint
+
+  pop r0  ; Pop error code
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0 
+ 
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 1
+  call sys_kprint
+
+  ldi r0, MSG_FAULT_ADDRESS
+  ldi r1, 0
+  call sys_kprint
+
+  pop r1       ; Pop faulting address
+  copy r0, r1  ; copy to arg1
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0 
+ 
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 1
+  call sys_kprint
+  call sys_newline
+
+  ldi r0, REG_MSG
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+  ; Do a long register dump
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+  copy r0, r1
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+  copy r0, r2
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r3
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r4
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r5
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r6
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r7
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r8
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r9
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r10
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 1
+  call sys_kprint
+
+copy r0, r11
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r12
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r13
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r14
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r15
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r16
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r17
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r18
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r19
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r20
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r21
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 1
+  call sys_kprint
+
+copy r0, r22
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+copy r0, r23
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+
+  call sys_newline
+
+  ; Now dump the memory around the crash region
+  ldi r0, MSG_CODE_DUMP
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+  push r20
+  call sys_kernel_panic.dump_loop
+  pop  r20
+ 
+  call sys_newline
+  ldi r0, MSG_END_PANIC
+  ldi r1, 0
+  call sys_kprint
+  jmp h
+
+  ; Die forever
+  h:
+  cli
+  hlt
+  jmp h
+
+sys_kernel_panic.dump_loop:
+  copy r0, r20
+  copy r1, r20
+  sub r0, 40 ; -40 bytes
+  add r1, 40 ; +40 bytes
+  jmp sys_kernel_panic.dump_print
+
+sys_kernel_panic.dump_print:
+  ; Print the current one, snip the first 6 zeroes because we are dumping bytes
+  rb r2, [r0]
+  cmp r0, r20
+  je sys_kernel_panic.dump_causer_found
+  clf
+  push r0
+  push r1 
+  copy r0, r2
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  add r0, 6
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+  pop r1
+  pop r0
+  cmp r0, r1
+  je sys_kernel_panic.dump_end
+  clf
+  add r0, 1
+  jmp sys_kernel_panic.dump_print
+
+sys_kernel_panic.dump_causer_found:
+  push r0 
+  push r1
+  push r2
+  ldi r0, MSG_BRACK_LFT
+  ldi r1, 0
+  call sys_kprint
+  pop r2
+  copy r0, r2 
+  ldi r1, ASCII_HEX_POOL
+  call hex_r0
+  ldi r0, ASCII_HEX_POOL
+  add r0, 6
+  ldi r1, 0
+  call sys_kprint
+  ldi r0, MSG_BRACK_RGT
+  ldi r1, 0
+  call sys_kprint
+  call sys_space
+  pop r1
+  pop r0
+  clf
+  add r0, 1
+  jmp sys_kernel_panic.dump_print
+
+sys_kernel_panic.dump_end:
+  clf
+  ret
+
+; Wrapper of B_LOAD_FILE
+;  r0: Pointer to the string name of the file
+;  r1: Where to load the file in memory
+;  r2: Print logs or not
+; Returns:
+;  r0: Status (1==file not found, 0=success)
+sys_loadfile:
+  ; FIX: Refresh metadata so we dont keep using stale metadata from boot
+  push r0 
+  push r1 ; DOUBLEFIX: Maybe preserve the most important arguments... 
+  call B_DISK_MOUNT ; this clobbers r0 and r1
+  pop r1
+  pop r0
+
+  cmp r2, 0 ; If they do not want no logs, call B_LOAD_FILE directly and return
+  je sys_loadfile.nolog
+
+  ; if not, then log it
+  push r1
+  push r0
+  ldi r0, MSG_LOG_FILE_LOAD
+  call sys_message
+  pop r0 ; get original r0 off the stack so we can print the file name
+  copy r16, r0 ; copy it into a reservation reg
+  ldi r1, 1 ; print with newline
+  call sys_kprint
+  push r16 ; re-push it
+
+  pop r0  
+  pop r1
+  call B_LOAD_FILE
+  ; Return code now in r0
+  cmp r0, 0 ; compare against success
+  je sys_loadfile.suc
+  ; If not, print a file not found log (nonzero = file not found)
+  jmp sys_loadfile.fnf
+
+sys_loadfile.fnf:
+  ldi r0, MSG_LOG_FILE_NOT_FOUND
+  call sys_error
+  copy r0, r16 ; initial string pointer should still be in r16
+  ldi r1, 1
+  call sys_kprint
+  ; Get original file not found status
+  ldi r0, 1
+  clf
+  ret
+
+sys_loadfile.suc:
+  ldi r0, MSG_LOG_FILE_LOAD_D
+  call sys_message
+  copy r0, r16 ; initial string pointer should still be in r16
+  ldi r1, 1
+  call sys_kprint
+  ; Get original success status
+  ldi r0, 0
+  clf
+  ret
+
+sys_loadfile.nolog:
+  call B_LOAD_FILE
+  ret
+
+; Main logging syscall
+; String to print in r0
+sys_message:
+  push r0
+  ldi r0, PREFIX_MESSAGE
+  ldi r1, 0 ; newline no thx <3
+  call sys_kprint
+  call sys_space
+  pop r0
+  ldi r1, 0 ; newline no thx <3
+  call sys_kprint
+  ret
+ 
+; Main logging syscall
+; String to print in r0
+sys_error:
+  push r0
+  ldi r0, PREFIX_ERROR
+  ldi r1, 0 ; newline no thx <3
+  call sys_kprint
+  call sys_space
+  pop r0
+  ldi r1, 0 ; newline no thx <3
+  call sys_kprint
+  ret
+
+; Writes a single char to video memory, and increments the cursor
+; r0 -> The char
+sys_emitchar:
+  push r0
+  call read_console_cursor
+  copy r1, r0
+  pop r0
+  wb [r1], r0
+  add r1, 1
+  copy r0, r1
+  cmp r0, VIDEO_MEMORY_ADDRESS_END
+  jh sys_emitchar.overflow
+  call write_console_cursor
+  ret
+
+; FIX:
+;  Make it like.. clear the screen when it overflows.. maybe??!
+;  WHY WAS THIS NOT ALREADY HERE!!?!?!!
+sys_emitchar.overflow:
+  call sys_clrscrn 
+  ret
+
+; Prints a singular space
+sys_space:
+  ldi r0, ' '
+  call sys_emitchar
+  ret
+
+; Prints a newline
+sys_newline:
+  ldi r0, '\n'
+  call sys_emitchar 
+  ret
+
+; Deletes the latest char put in video memory
+sys_delchar:
+  ; Read latest char
+  call read_console_cursor
+
+  ; The pointer points to the char after, subtract it by 1 and write a 0
+  call read_console_cursor
+  ; if it already points to the base of video memory, just return
+  cmp r0, VIDEO_MEMORY_ADDRESS_BASE
+  je sys_delchar.dont
+  
+  ; if not, decrement r0, write a 0 there and save the cursor back
+  sub r0, 1
+  ldi r1, 0
+  wb [r0], r1
+
+  call write_console_cursor  ; Write updated value to the cursor
+
+  clf
+  ret
+
+
+  
+  
+  
+sys_delchar.dont:
+  clf
+  ret
+
+; Extended Kernel print syscall 
+; *Adds basic argument support*
+; 
+; Args:
+; r0 -> Address of the string
+; r1 -> Whether or not to print a newline 
+; r2 -> Address of the argument string
+; 
+; How it works:
+; When the main string *(pointer r0)* comes accross a '~' char, it injects the string at *r2* into the main string being printed.
+; Multi-args are not supported.
+sys_kprintEx:
+  copy r21, r2
+  jmp sys_kprintEx.loop
+
+sys_kprintEx.arg_char_found:
+  ; Print the arg with no newline using normal sys_kprint
+  push r0
+  push r1
+  push r2
+  copy r2, r21
+  copy r0, r2
+  ldi r1, 0
+  call sys_kprint
+  ; Continue printing our string
+  pop r2  
+  pop r1
+  pop r0
+  add r0, 1 ; FIX: Skip over '~' char
+  jmp sys_kprintEx.loop
+
+sys_kprintEx.loop:
+  ; use sys_emitchar for every char we find until we hit 0
+  ; read current 
+  rb r2, [r0]          
+  ; Compare against arg char
+  cmp r2, '~'
+  je sys_kprintEx.arg_char_found
+  clf
+  ; compare against 0
+  cmp r2, 0
+  ; if it is 0, check if the user wanted a newline
+  je sys_kprintEx.checkn
+  clf
+  ; if it is not, write the char to video memory
+  push r0 ; preserve our pointer
+  push r1 ; preserve our newline bool
+  copy r0, r2
+  call sys_emitchar
+  pop r1
+  pop r0  ; get our preserved r0 back
+  
+  ; Add 1 to the string we are printing
+  add r0, 1                              
+  cmp r0, VIDEO_MEMORY_ADDRESS_END
+
+  ; repeat the loop
+  jmp sys_kprintEx.loop
+  
+
+sys_kprintEx.checkn:
+  ; if they did not want a newline, then skip this
+  cmp r1, 0
+  je sys_kprintEx.end
+  clf
+  ; if they did, write a singular newline
+  ldi r0, '\n'
+  call sys_emitchar
+  
+  ; then return
+  jmp sys_kprintEx.end
+
+
+sys_kprintEx.end:
+  clf 
+  ret
+
+; Kernel print syscall
+; r0 -> Address of the string
+; r1 -> Whether or not to print a newline 
+sys_kprint:
+  jmp sys_kprint.loop
+
+sys_kprint.loop:
+  ; use sys_emitchar for every char we find until we hit 0
+  ; read current 
+  rb r2, [r0]           ; FIX: Change 'rw' to 'rb'
+  ; compare against 0
+  cmp r2, 0
+  ; if it is 0, check if the user wanted a newline
+  je sys_kprint.checkn
+  clf
+  ; if it is not, write the char to video memory
+  push r0 ; preserve our pointer
+  push r1 ; preserve our newline bool
+  copy r0, r2
+  call sys_emitchar
+  pop r1
+  pop r0  ; get our preserved r0 back
+  
+  ; Add 1 to the string we are printing
+  add r0, 1                              ; FIX: Incremented r0
+  cmp r0, VIDEO_MEMORY_ADDRESS_END
+
+  ; repeat the loop
+  jmp sys_kprint.loop
+  
+
+sys_kprint.checkn:
+  ; if they did not want a newline, then skip this
+  cmp r1, 0
+  je sys_kprint.end
+  clf
+  ; if they did, write a singular newline
+  ldi r0, '\n'
+  call sys_emitchar
+  
+  ; then return
+  jmp sys_kprint.end
+
+
+sys_kprint.end:
+  clf 
+  ret
+  
+; Reads a single line of keyboard input into INPUTDATA_ADDRESS 
+sys_readline:
+  call sys_clrbuf
+  call read_console_cursor
+  copy r9, r0                  ; Save the console cursor so we can wind it back when we print the input written
+  int 0x0A ; BIOS Interrupt clear keyboard buffer
+
+  ldi r6, INPUTDATA_ADDRESS ; Current key pointer
+  ; Get the end of input data address
+  copy r7, r6
+  add r7, 96  ; r7 = end address of INPUTDATA
+  ; Fall through to here (no need for jmp)
+  sys_readline.read_key_loop:
+    ; Print the current command
+    copy r0, r9
+    call write_console_cursor
+    ldi r0, INPUTDATA_ADDRESS
+    ldi r1, 0
+    call sys_kprint
+    
+
+    sti
+    hlt ; Wait for an interrupt
+    cli
+    ; Upon an interrupt, jump to the handler
+    jmp sys_readline.key_pressed
+
+sys_readline.key_pressed:
+    call sys_readline.read_key
+    ; If it is a return key, input is done and we have read a line
+    cmp r0, 13 ; ASCII Carrige Return
+    je sys_readline.c_return
+    
+    cmp r0, 8  ; ASCII Backspace
+    je sys_readline.backspace
+
+    ; If we are above the bounds of INPUTDATA_ADDRESS, then clear INPUTDATA_ADDRESS and reset the cursor
+    cmp r6, r7
+    je sys_readline.full
+
+    ; If not any special key, just write the key to the buffer
+    wb  [r6], r0
+    add r6, 1
+    jmp sys_readline.read_key_loop
+    
+
+
+; Returns current relative cursor in r0
+; Returns it pointing to the last key, not the next slot
+sys_readline.read_k_cursor:
+  rb r0, [KEYBOARD_CURSOR_ADDRESS] 
+  ; Cursor address is relative to the keyboard buffer
+  add r0, KEYBOARD_BUFFER_BASE
+  sub r0, 1 ; Decrese r1 to get the last key
+  ret
+
+; Returns the latest key pressed in r0
+sys_readline.read_key:
+  call sys_readline.read_k_cursor
+  copy r1, r0
+  rb   r0, [r1]
+  ret
+
+sys_readline.backspace:
+  ; Wind back the cursor by 1 and remove the key just pressed
+  ; Only wind back by one if there have been keys pressed
+  ; Don't check size bounds, we cannot overflow on a backspace
+  ldi r8, INPUTDATA_ADDRESS
+  cmp r6, r8
+  ; If equal to base address, do nothing
+  je sys_readline.read_key_loop
+
+  sub r6, 1
+  ldi r0, 0
+  wb  [r6], r0
+
+  ; And also remove that char from video memory
+  call sys_delchar
+  jmp sys_readline.read_key_loop
+
+sys_readline.full:
+  call sys_clrbuf
+  call read_console_cursor
+  copy r9, r0                  ; Save the console cursor so we can wind it back when we print the command
+  int 0x0A ; BIOS Interrupt clear keyboard buffer
+
+  ldi r6, INPUTDATA_ADDRESS ; Current key pointer
+  ; Get the end of input data address
+  copy r7, r6
+  add r7, 96  ; r7 = end address of INPUTDATA
+  jmp sys_readline ; Restart everything
+
+sys_readline.c_return:
+  call sys_newline
+  clf
+  ret
+
+; Wrapper of B_STRCMP
+; r0 = String A
+; r1 = String B
+;
+; Result = r0
+; 1=same
+; 0=diff
+sys_strcmp:
+  call B_STRCMP
+  ret
+
+
+; Hacked version of B_STRCMP that terminates on space, not \0
+;  r0 = String A
+;  r1 = String B
+;
+; Result = r0
+; 1=same
+; 0=diff
+sys_strcmp_space:
+  jmp sys_strcmp_space.loop
+
+sys_strcmp_space.loop:
+  ; Read current bytes
+  rb r2, [r0]
+  rb r3, [r1]
+  
+  ; Compare them
+  cmp r2, r3
+  jne sys_strcmp_space.wrong ; If not equal, then they are wrong
+  clf
+
+  ; Check for space termination of A
+  cmp r2, 32
+  je sys_strcmp_space.same  ; Go directly to same because if B was not 32, it would have been picked up before
+  clf
+
+  ; Increment pointers
+  add r0, 1
+  add r1, 1
+
+  ; Repeat
+  jmp sys_strcmp_space.loop
+  
+  
+sys_strcmp_space.wrong:
+  ldi r0, 0
+  clf
+  ret
+
+sys_strcmp_space.same:
+  ldi r0, 1
+  clf
+  ret
+
+
+; Clears the keyboard input buffer
+sys_clrbuf:
+  ldi r0, INPUTDATA_ADDRESS
+  copy r1, r0
+  add r1, 96 ; Size of the input buffer
+
+  jmp sys_clrbuf.loop
+
+sys_clrbuf.loop:
+  ldi r2, 0
+  wb [r0], r2
+
+  cmp r0, r1
+  je sys_clrbuf.end
+
+  add r0, 1
+  jmp sys_clrbuf.loop
+
+sys_clrbuf.end:
+  clf
+  ret
+
+; Copies a chunk of memory to a new address
+;  r0 = Source
+;  r1 = Dest  
+;  r2 = Bytes to copy
+sys_memcpy:
+  cmp r2, 0
+  je sys_memcpy.end
+  jmp sys_memcpy.loop
+sys_memcpy.loop:
+  rb r3, [r0]
+  wb [r1], r3
+  add r0, 1
+  add r1, 1
+  sub r2, 1
+  cmp r2, 0
+  je sys_memcpy.end
+  jmp sys_memcpy.loop
+sys_memcpy.end:
+  clf
+  ret
+
+; Makes a list of present files, seperated by newlines at the address you give it
+; r0 = Address to put the list
+sys_makefilelist:
+  ldi r1, METADATA_MOUNT_ADDRESS
+  
+sys_makefilelist.loop:
+  ; Add ten to get to filename entry
+  add r1, 10
+
+  ; Compare against 0, if it is 0, we have hit the end of the metadata
+  rb  r2, [r1]
+  cmp r2, 0
+  je sys_makefilelist.done
+  clf 
+
+  ; If not, then copy it to our pointer at the address to place the table
+  copy r3, r1 ; Working copy of r3    
+  jmp sys_makefilelist.string_append_loop
+
+; r3 = address of the string to append
+sys_makefilelist.string_append_loop:
+  rb r2, [r3]
+  cmp r2, 0
+  je sys_makefilelist.string_append_done
+  ; if not 0, write
+  wb [r0], r2
+  add r3, 1
+  add r0, 1
+  jmp sys_makefilelist.string_append_loop
+
+sys_makefilelist.string_append_done:
+  ; Add a seperating newline
+  ldi r5, '\n'
+  wb  [r0], r5
+  add r0, 1
+  clf
+  add r1, 20 ; Filenames are fixed 20-bytes long
+  jmp sys_makefilelist.loop
+
+sys_makefilelist.done:
+  clf
+  ret
+
+; Clears video memory
+sys_clrscrn:
+  ldi r0, VIDEO_MEMORY_ADDRESS_BASE
+  ldi r1, VIDEO_MEMORY_ADDRESS_END
+  jmp sys_clrscrn.loop
+
+sys_clrscrn.loop:
+  ldi r2, 0
+  wb [r0], r2
+  cmp r0, r1
+  je sys_clrscrn.end
+  add r0, 1
+  jmp sys_clrscrn.loop
+
+sys_clrscrn.end:
+  ldi r0, 0
+  call write_console_cursor
+  clf 
+  ret

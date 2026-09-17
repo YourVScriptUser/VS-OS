@@ -1,0 +1,133 @@
+origin 0x00005C00 ; Address of where the BIOS puts the bootloader
+
+; Copyright VSK 2026, all rights reserved
+
+; VS-OS non-extended bootloader
+; Loaded at sector 0
+
+region 0 ; Sector 0
+; Main Boot Master Header
+db 0x55, 0xAA
+db "VSK VS-OS Bootloader 1.1", 0
+
+region 64 ; Byte offset 5C40 (Boot sector executable code offset)
+; Load extended bootloader for the SSFS (Simple Sector File System)
+; Extended bootloader in sectors 1-3
+; Sector 4 is reserved for the file table
+; Load those sectors to 00006000 then jump to that address
+cli
+
+ldi r0, 'S'
+int 0x0E
+ldi r0, 't'
+int 0x0E
+ldi r0, 'a'
+int 0x0E
+ldi r0, 'r'
+int 0x0E
+ldi r0, 't'
+int 0x0E
+ldi r0, 'i'
+int 0x0E
+ldi r0, 'n'
+int 0x0E
+ldi r0, 'g'
+int 0x0E
+ldi r0, ' '
+int 0x0E
+ldi r0, 'V'
+int 0x0E
+ldi r0, 'S'
+int 0x0E
+ldi r0, '-'
+int 0x0E
+ldi r0, 'O'
+int 0x0E
+ldi r0, 'S'
+int 0x0E
+ldi r0, '\n'
+int 0x0E
+
+
+ldi r0, 1
+ldi r1, 0x00006000
+int 0x05 
+
+; Compare the first 2 bytes against 55 AA
+rb r2, [0x00006000]
+cmp r2, 0x55
+jne extboot_notfound
+
+rb r2, [0x00006001]
+cmp r2, 0xAA
+jne extboot_notfound
+clf
+
+add r0, 1
+add r1, 1024
+int 0x05
+
+add r0, 1
+add r1, 1024
+int 0x05
+
+jmp 0x00006002
+
+extboot_notfound:
+  ; print '\nBootstrap Failed'
+  ldi r0, '\n'
+  int 0x0E
+
+  ldi r0, 'B'
+  int 0x0E
+  
+  ldi r0, 'o'
+  int 0x0E
+  
+  ldi r0, 'o'
+  int 0x0E
+  
+  ldi r0, 't'
+  int 0x0E
+  
+  ldi r0, 's'
+  int 0x0E
+  
+  ldi r0, 't'
+  int 0x0E
+  
+  ldi r0, 'r'
+  int 0x0E
+  
+  ldi r0, 'a'
+  int 0x0E
+  
+  ldi r0, 'p'
+  int 0x0E
+  
+  ldi r0, ' '
+  int 0x0E
+  
+  ldi r0, 'F'
+  int 0x0E
+  
+  ldi r0, 'a'
+  int 0x0E
+  
+  ldi r0, 'i'
+  int 0x0E
+  
+  ldi r0, 'l'
+  int 0x0E
+  
+  ldi r0, 'e'
+  int 0x0E
+  
+  ldi r0, 'd'
+  int 0x0E
+  
+  e_halt:
+    cli 
+    hlt
+    jmp e_halt
+  

@@ -1,0 +1,419 @@
+origin 0x00006C00 ; BOOTSTRAP.x32 loads this file at this address 
+jmp kern_main
+; Register convention:
+;  r0-r15:  Nuke these, clobber them as much as you want, preserve when needed
+;  r16-r23: Preserve these
+
+; Error IVT ID list:
+; Unknown Opcode:                    63
+; Invalid Flags:                     62
+; Invalid Register:                  61
+; Invalid Memory Write:              60
+; Unknown Error:                     59
+
+; KB_PORT                    : 0x4B # The keyboard port, holds the key pressed
+; STORAGE_STATUS_NOTIFY_PORT : 0x00 # Tells the disk to do something 
+; STORAGE_SECTOR_PORT        : 0xEA # Disk sector port
+; STORAGE_ADDRESS_PORT       : 0xEB # Where the disk writes the sector to memory
+; STORAGE_STORAGE_MODE       : 0xEC # Disk mode port 1 = read, 2 = write
+
+; Upon a CPU exception:
+; r0 = Error Code        ( Set by emulator )
+; r1 = Faulting IP       ( Set by emulator )
+
+; r0 = IP at the call (return pointer)
+unauthorized_call_return_early:
+  copy r16, r0
+  push r0 
+  ldi r0, ERROR_IN_CALL
+  ldi r1, 0
+  call sys_kprint
+  ldi r1, ASCII_HEX_POOL
+  pop r0
+  call hex_r0
+  push r0                    ; we will go back to this
+  ldi r0, ASCII_HEX_POOL
+  ldi r1, 1
+  call sys_kprint
+  
+  ; Return early
+  clf
+  ret
+
+error_handler_memory_error:
+  push r0
+  push r1
+  copy r2, r1
+  ldi r1, ASCII_HEX_POOL
+  copy r0, r2
+  call hex_r0
+  ldi r0, K_EXCEP_CAUGHT.memory_error
+  ldi r1, 1
+  ldi r2, ASCII_HEX_POOL
+  call sys_kprintEx
+  pop r1
+  pop r0
+
+  ; if r1 (faulting IP) was inside kernel memory, do a panic
+  cmp r1, USERMODE_START  ; if faulting ip < usermode start
+  jl sys_kernel_panic     ; panic
+
+  ; resume shell
+  clf
+  jmp shell_main
+
+error_handler_invalid_flags:
+  push r0
+  push r1
+  copy r2, r1
+  ldi r1, ASCII_HEX_POOL
+  copy r0, r2
+  call hex_r0
+  ldi r0, K_EXCEP_CAUGHT.opcode_flags
+  ldi r1, 1
+  ldi r2, ASCII_HEX_POOL
+  call sys_kprintEx
+  pop r1
+  pop r0
+
+  pop r1
+  pop r0
+
+  ; if r0 was inside kernel memory, do a panic
+  cmp r1, USERMODE_START  ; if faulting ip < usermode start
+  jl sys_kernel_panic     ; panic
+
+  ; resume shell
+  clf
+  jmp shell_main
+
+error_handler_unknown_error:
+  push r0
+  push r1
+  copy r2, r1
+  ldi r1, ASCII_HEX_POOL
+  copy r0, r2
+  call hex_r0
+  ldi r0, K_EXCEP_CAUGHT.unknown
+  ldi r1, 1
+  ldi r2, ASCII_HEX_POOL
+  call sys_kprintEx
+  pop r1
+  pop r0
+
+  pop r1
+  pop r0
+  ; if r0 was inside kernel memory, do a panic
+  cmp r0, USERMODE_START  ; if faulting ip < usermode start
+  jl sys_kernel_panic     ; panic
+
+  ; resume shell
+  clf
+  jmp shell_main
+
+error_handler_unknown_opcode:
+  push r0
+  push r1
+  copy r2, r1
+  ldi r1, ASCII_HEX_POOL
+  copy r0, r2
+  call hex_r0
+  ldi r0, K_EXCEP_CAUGHT.unknown_opcode
+  ldi r1, 1
+  ldi r2, ASCII_HEX_POOL
+  call sys_kprintEx
+  pop r1
+  pop r0
+
+  pop r1
+  pop r0
+
+  ; if r0 was inside kernel memory, do a panic
+  cmp r1, USERMODE_START  ; if faulting ip < usermode start
+  jl sys_kernel_panic     ; panic
+
+  ; resume shell
+  clf
+  jmp shell_main
+
+
+; Writes r0 to the cursor
+write_console_cursor:
+  copy r17, r0
+  ; Make sure the return pointer is not inside usermode memory
+  pop r0
+  cmp r0, USERMODE_START
+  jh unauthorized_call_return_early  ; if r0 (return pointer) > usermode
+  push r0
+  copy r0, r17
+  ww [KERNEL_CONSOLE_CURSOR_ADDRESS], r0
+  ret
+  
+
+; Returns the current cursor in r0
+; Returns the value relative to the base address of video memory
+read_console_cursor:
+  ; Make sure the return pointer is not inside usermode memory
+  pop r0
+  cmp r0, USERMODE_START
+  jh unauthorized_call_return_early  ; if r0 (return pointer) > usermode
+  push r0
+
+  rw r0, [KERNEL_CONSOLE_CURSOR_ADDRESS]
+
+  add r0, VIDEO_MEMORY_ADDRESS_BASE
+  ret
+
+init_terminal:
+  ; Make sure the return pointer is not inside usermode memory
+  pop r0
+  cmp r0, USERMODE_START
+  jh unauthorized_call_return_early  ; if r0 (return pointer) > usermode
+  push r0
+
+  call init_terminal.find_vga_end ; Returns in r0
+  call write_console_cursor       ; Takes r0
+  
+  ret
+
+; Returns end address in r0
+init_terminal.find_vga_end:
+  ; Make sure the return pointer is not inside usermode memory
+  pop r0
+  cmp r0, USERMODE_START
+  jh unauthorized_call_return_early  ; if r0 (return pointer) > usermode
+  push r0
+
+  ldi r0, VIDEO_MEMORY_ADDRESS_BASE
+  ldi r1, VIDEO_MEMORY_ADDRESS_END
+  xor r2, r2 ; used as current
+
+  jmp init_terminal.find_vga_end_loop
+ 
+init_terminal.find_vga_end_loop:
+  rb r2, [r0]
+  cmp r2, 0
+  je init_terminal.loop_end
+  add r0, 1
+  cmp r0, r1
+  je init_terminal.loop_end
+  jmp init_terminal.find_vga_end_loop
+
+init_terminal.loop_end:
+  clf
+  ret
+
+syscalls_not_found:
+  ldi r0, SYSCALL_NOT_FOUND_MSG
+  call B_EARLY_PRINT
+
+  jmp halt
+
+TEXT.BIN_nf:
+  ldi r0, ERROR_MODULE_TEXT
+  ldi r1, 1
+  call sys_kprint
+  jmp continue_text.bin.nf
+
+SYMBOLS.SYM_nf:
+  ldi r0, ERROR_MODULE_SYMB
+  ldi r1, 1
+  call sys_kprint
+  jmp continue_symbols.sym.nf
+
+; Main kernel initialization code
+kern_main:
+  ; Print main header
+  ldi r0, BOOT_HEADER
+  call B_EARLY_PRINT
+  
+  ; Load SYSCALLS.BIN
+  ldi r0, FILE_SYSCALLS.BIN
+  ldi r1, FILE_SYSCALLS.BIN_LOAD
+  call B_LOAD_FILE
+  cmp r0, 1
+  je syscalls_not_found
+  
+ 
+
+  call init_terminal
+  call sys_newline
+
+  ; Load TEXT.BIN
+  ldi r0, FILE_TEXT.BIN
+  ldi r1, FILE_TEXT.BIN_LOAD
+  ldi r2, 0
+  call sys_loadfile
+  cmp r0, 1
+  je TEXT.BIN_nf
+  continue_text.bin.nf:  
+
+  ; Load SYMBOLS.SYM
+  ldi r0, FILE_SYMBOLS.SYM
+  ldi r1, FILE_SYMBOLS.SYM_LOAD
+  ldi r2, 0
+  call sys_loadfile
+  cmp r0, 1
+  je SYMBOLS.SYM_nf
+  continue_symbols.sym.nf:  
+
+  ; Populate fault vectors
+  ; Unknown opcode 63
+  ldi r0, 63
+  mul r0, 4  ; id * 4 = vector because ISRs are dwords
+  ldi r1, error_handler_unknown_opcode
+  mov [r0], r1
+  ; This can also fit under invalid register 
+  ldi r0, 61
+  mul r0, 4 
+  ldi r1, error_handler_unknown_opcode
+  mov [r0], r1
+   
+
+  ; Unknown error 59
+  ldi r0, 59
+  mul r0, 4
+  ldi r1, error_handler_unknown_error
+  mov [r0], r1
+
+  ; Bad flags 62
+  ldi r0, 62
+  mul r0, 4
+  ldi r1, error_handler_invalid_flags
+  mov [r0], r1
+
+  ; Memory error 60
+  ldi r0, 60
+  mul r0, 4
+  ldi r1, error_handler_memory_error
+  mov [r0], r1
+
+  ; Unknown Opcode:                    63
+  ; Invalid Flags:                     62
+  ; Invalid Register:                  61
+  ; Invalid Memory Write:              60
+  ; Unknown Error:                     59
+
+  ldi r0, FILE_SHELL.BIN
+  ldi r1, FILE_SHELL.BIN_LOAD
+  ldi r2, 0
+  call sys_loadfile
+
+  cmp r0, 1
+  je shell_missing
+
+  sti ; It is now safe to turn on interrupts (BOOTLOADER.x32 turns them off)
+  jmp FILE_SHELL.BIN_LOAD
+  
+shell_missing:  
+  ldi r0, SHELL_MISSING_MSG
+  call sys_error
+
+  jmp halt
+
+; VSK-32 Video Color bytes:
+;  130: RED
+;  131: GREEN
+;  132: BLUE
+;  133: GREY
+;  134: CYAN
+;  135: BACKGROUND RED
+;  136: RESET
+
+; Points to the kernel terminal console
+KERNEL_CONSOLE_CURSOR_ADDRESS: dw 0
+FILE_TEXT.BIN: db "TEXT.BIN", 0
+FILE_SYMBOLS.SYM: db "SYMBOLS.SYM", 0
+ERROR_MODULE_TEXT: db "WARNING: kernel module missing: TEXT.BIN", 0
+ERROR_MODULE_SYMB: db "WARNING: kernel module missing: SYMBOLS.SYM", 0
+ERROR_IN_CALL: db "ERROR: unauthorized kernel routine call at ", 0
+SHELL_MISSING_MSG: db "'SHELL.BIN' missing", 0
+FILE_SYSCALLS.BIN: db "SYSCALLS.BIN", 0
+FILE_SHELL.BIN: db "SHELL.BIN", 0
+ASCII_HEX_POOL: db 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0
+BOOT_HEADER:
+  db 10,  131,  "VS-OS Kernel | version 1.6 [6/09/2026]",      10, 132
+  db            "Copyright VSK Software 2026", 10
+  db            "256MiB Memory Expected Available", 10
+
+  db 136, 0
+
+PREFIX_MESSAGE:
+  db "MESSAGE:"
+ 
+  db 0
+
+PREFIX_ERROR:
+  db "ERROR:"
+ 
+  db 0
+
+REG_MSG: db "gpr:", 0
+MSG_LOG_FILE_LOAD: db "Loading file: ", 0
+MSG_LOG_FILE_NOT_FOUND: db "File not found: ", 0
+MSG_LOG_FILE_LOAD_D:  db "Loaded file: ", 0
+K_EXCEP_CAUGHT.unknown: db "ERROR: generic exception at instruction 0x~", 0
+K_EXCEP_CAUGHT.opcode_flags: db "ERROR: opcode flags byte invalid at instruction 0x~", 0
+K_EXCEP_CAUGHT.unknown_opcode: db "ERROR: unknown opcode at instruction 0x~", 0
+K_EXCEP_CAUGHT.memory_error: db "ERROR: memory read/write failure at instruction 0x~", 0
+MSG_KERNEL_PANIC:
+  db 135,"---------- [ kernel panic ] ----------",136, "\n"
+  db     "                ",134," VS-OS",136,"                 \n\n"
+  db     "kernel version         1.6 [6/09/2026]\n"
+  db     "bootloader version     1.1\n", 0
+MSG_END_PANIC: db 135,"---------- [ kernel panic ] ----------",136, "\n", 0
+MSG_CODE_DUMP: db "code:", 0
+MSG_BRACK_LFT: db "(", 0
+MSG_BRACK_RGT: db ")", 0
+MSG_ERROR_CODE: db    "Error Code:  ", 0
+MSG_FAULT_ADDRESS: db "Faulting IP: ", 0
+SYSCALL_NOT_FOUND_MSG: db "ERROR: 'SYSCALLS.BIN' missing", 0
+; Where sys_readline puts the read data
+; 96 Bytes long
+INPUTDATA_ADDRESS: dd 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+; Markers
+origin 0
+region 0x00010000
+; Address that `TEXT.BIN` loads to
+FILE_TEXT.BIN_LOAD:
+region 0x0E000000
+; Address that `SYMBOLS.SYM` loads to
+FILE_SYMBOLS.SYM_LOAD:
+
+region 0x00020000
+; Address that `SYSCALLS.BIN` loads to
+FILE_SYSCALLS.BIN_LOAD:
+
+region 0x00030000 
+; Address that `SHELL.BIN` loads to
+FILE_SHELL.BIN_LOAD:
+; The start of usermode memory
+USERMODE_START:
+
+region 0x00000F00
+; Base address of the keyboard buffer
+KEYBOARD_BUFFER_BASE:
+
+region 0x00000EFF
+; Pointer to the keyboard buffer cursor
+KEYBOARD_CURSOR_ADDRESS:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

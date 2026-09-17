@@ -1,0 +1,96 @@
+origin 0x00010000 ; KERNEL.x32 loads this file at this address
+
+; Turns r0 into a ascii byte stream and puts it into [r1]
+ascii_r0:
+    copy   r3, r0           ; r3 = working value
+    ldi    r2, 0            ; r2 = digit count so far
+
+    ; special case: value is exactly 0 -> emit a single '0'
+    cmp    r3, 0
+    jne    .dec_extract_loop
+    ldi    r4, 48            ; '0'
+    wb     [r1], r4
+    ldi    r2, 1
+    jmp    .dec_done
+
+.dec_extract_loop:
+    cmp    r3, 0
+    je     .dec_write_loop
+
+    ; --- digit = r3 - (r3/10)*10 ; r3 = r3/10 ---
+    copy   r5, r3
+    div    r5, 10            ; r5 = r3 / 10   (base-10 "shift right")
+    copy   r6, r5
+    mul    r6, 10            ; r6 = (r3/10)*10
+    copy   r7, r3
+    sub    r7, r6             ; r7 = r3 - (r3/10)*10 = digit (0..9)
+
+    add    r7, 48             ; digit -> ASCII '0'..'9'
+    push   r7                 ; stage digit (comes off LSB-first)
+    add    r2, 1               ; digit count++
+
+    copy   r3, r5              ; r3 = r3 / 10, continue with the rest
+    jmp    .dec_extract_loop
+
+.dec_write_loop:
+    ; pop digits back off in reverse -> lands MSB-first in [r1..]
+    copy   r4, r2              ; r4 = remaining digits to write
+    copy   r6, r1               ; r6 = write cursor, starts at r1
+
+.dec_write_one:
+    cmp    r4, 0
+    je     .dec_done
+    pop    r7                    ; r7 = next digit, comes off MSB-first
+    wb     [r6], r7
+    add    r6, 1
+    sub    r4, 1
+    jmp    .dec_write_one
+
+.dec_done:
+    ret
+
+hex_r0:
+    copy   r2, r0          ; r2 = working copy of the value
+    ldi    r4, 7           ; r4 = digit slot index, 7 (LSB) -> 0 (MSB)
+ 
+.hex_digit_loop:
+    ; --- isolate the lowest nibble of r2 into r3 ---
+    ; r3 = r2 - (r2 / 16) * 16     (== r2 & 0xF, no reg/imm AND needed)
+    copy   r5, r2
+    div    r5, 16          ; r5 = r2 / 16   (this *is* shr 4)
+    copy   r3, r5
+    mul    r3, 16          ; r3 = (r2 / 16) * 16
+    copy   r6, r2
+    sub    r6, r3           ; r6 = r2 - (r2/16)*16 = low nibble
+    copy   r3, r6           ; r3 = low nibble (0..15)
+ 
+    ; --- shift r2 right by 4 for the next round ---
+    copy   r2, r5
+ 
+    ; --- convert nibble in r3 to an ASCII hex digit ---
+    cmp    r3, 10
+    jl     .hex_digit_09
+    add    r3, 55          ; 10..15 -> 'A'..'F'   (55 = 'A' - 10)
+    jmp    .hex_digit_store
+.hex_digit_09:
+    add    r3, 48          ; 0..9   -> '0'..'9'   (48 = '0')
+ 
+.hex_digit_store:
+    ; --- write the ASCII digit to [r1 + digit_slot] ---
+    copy   r5, r1
+    add    r5, r4
+    wb     [r5], r3
+ 
+    ; --- next digit (walking from the LSB slot down to the MSB slot) ---
+    cmp    r4, 0
+    je     .hex_digit_done
+    sub    r4, 1
+    jmp    .hex_digit_loop
+ 
+.hex_digit_done:
+    ret
+ 
+
+
+
+

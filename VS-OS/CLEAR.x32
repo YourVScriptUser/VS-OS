@@ -1,0 +1,4 @@
+origin 0x00040000 ; SHELL.BIN loads this file at this address
+
+call sys_clrscrn
+ret

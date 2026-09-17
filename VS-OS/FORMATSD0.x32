@@ -1,0 +1,85 @@
+origin 0x00050000
+db 0xCA, 0xFE
+
+ldi r0, msg_start
+ldi r1, 0
+call sys_kprint
+call sys_readline
+call sys_newline
+
+ldi r0, INPUTDATA_ADDRESS
+ldi r1, txt_yes
+call sys_strcmp
+cmp r0, 0
+je done
+
+; Wipes the entire harddisk
+; Don't wipe every sector, only up to sector 200
+; We don't use sector 200 anyway, hell we barely use sector 20
+ldi r0, msg_do
+ldi r1, 1
+call sys_kprint
+
+ldi r5, 200
+ldi r0, 0
+
+format_loop:
+  ldi r1, print_as_run
+  push r5
+  push r2
+  push r1
+  push r0
+  call ascii_r0
+  pop r0
+  pop r1
+  pop r2
+  pop r5
+  ldi r1, zero_sector
+  int 0x06
+  cmp r0, r5 
+  je done_erase
+  add r0, 1 
+
+  push r5
+  push r2
+  push r1
+  push r0
+  ldi r0, print_as_run
+  sub r0, 1
+  ldi r1, 0
+  call sys_kprint
+  pop r0
+  pop r1
+  pop r2
+  pop r5
+  jmp format_loop
+
+done_erase:
+  call sys_newline
+  ldi r0, msg_end
+  ldi r1, 1
+  call sys_kprint
+  jmp done
+
+done:
+  clf
+  ret ; return from command
+
+msg_start:
+  db "Will erase all data on sd0!\nContinue? Type 'yes' to continue> ", 0
+
+msg_end:
+  db "sd0 has been erased", 0
+
+msg_do:
+  db "Erasing sd0...", 0
+
+txt_yes:
+  db "yes", 0
+
+db 32
+print_as_run:
+  dd 0, 0, 0, 0, 0, 0, 0, 0
+
+zero_sector:
+  dd 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0

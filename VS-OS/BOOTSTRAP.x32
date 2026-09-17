@@ -1,0 +1,369 @@
+origin 0x00006000 ; boot.x32 loads this file at this address
+db 0x55, 0xAA     ; BOOTLOADER.x32 checks this
+
+; Extended VS-OS bootloader
+; Presents file I/O, early text printing and initializes some stuff
+; Defined register usage:
+; r0-r15:  Can be nuked clobbered, expect to change at any time
+; r16-r23: Please preserve accross calls and stuff
+
+; Directory (sector 4) entry format, 30 bytes each, up to 34 entries:
+;    offset  size  field
+;    0       1     0xFE  (File Entry magic)
+;    1       4     start sector
+;    5       4     length in sectors
+;    9       1     0xFD  (File Descriptor magic)
+;    10      20    filename, ASCII, NUL-padded
+; Filesystem is called SSFS (Simple Sector File System)
+
+jmp ext_boot_main
+
+; Main entrypoint of BOOTSTRAP.x32
+ext_boot_main:
+  ; Don't clear screen, the BIOS clears the screen before running the bootloader and the address of the BIOS'es video cursor is dynamic.
+  ; initialize the stack
+  ssp STACK_BASE_ADDRESS 
+
+  ; Mount the disk
+  call B_DISK_MOUNT
+
+  ; Load the kernel
+  ldi r0, KERNEL_FILE
+  ldi r1, KERNEL_LOAD_ADDRESS
+  call B_LOAD_FILE
+  ; if B_LOAD_FILE returns 1, the kernel was not found.
+  cmp r0, 1
+  je kernel_not_found
+  clf
+  
+  ; Run the kernel
+  jmp KERNEL_LOAD_ADDRESS
+
+kernel_not_found:
+  ldi r0, KERNEL_N_MSG
+  call B_EARLY_PRINT
+
+  jmp halt
+
+
+; Halts forever.
+halt:
+  cli
+  hlt 
+  jmp halt  
+  
+
+; **B_DISK_MOUNT**
+; *Defined in: 'BOOTSTRAP.x32'*
+;
+; Loads sector 4 to 0x0F000000
+B_DISK_MOUNT:
+  ldi r0, 4
+  ldi r1, 0x0F000000
+  int 0x05
+  
+  ret
+
+
+; File handlers
+
+; **B_LOAD_FILE**
+; *Defined in: 'BOOTSTRAP.x32'*
+;
+; Register ops:
+;  r0: Pointer to the string name of the file
+;  r1: Adress to load the file
+; Register returns:
+;  r0: Status
+; 
+; *Status = 1=Error, 0=Success*
+B_LOAD_FILE:
+  ; Load the args into different registers that don't get clobbered
+  copy r8, r0 ; r8 = String name pointer
+  copy r9, r1 ; r9 = Load address
+
+  ; First, we must verify the file exists
+  call B_FILE_EXISTS ; B_FILE_EXISTS takes the string name in r0, no need for copy.
+  cmp r0, 0          ; compare return against 0
+  je B_LOAD_FILE.file_nonexist ; If the file does not exist (r0 was 0)
+
+  xor r2, r2 ; r2 = Current (VAR)
+  ldi r3, METADATA_MOUNT_ADDRESS ; r3 = Pointer (VAR)
+  ; No need to check bounds, if the file does not exist then we would have returned earlier.
+  jmp B_LOAD_FILE.loop
+
+B_LOAD_FILE.loop:
+  ; Get current byte
+  rb r2, [r3]
+
+  ; Increment pointer
+  add r3, 1
+
+  ; If it is not a file entry descriptor, then repeat
+  cmp r2, FILE_ENTRY_MAGIC
+  jne B_LOAD_FILE.loop
+  clf
+
+  ; If there is one, skip forward 9 times to compare the file name
+  ; Then subtract by 9 to get back to where we were
+  add r3, 9
+  ; r8 is the string name pointer
+  ; Preserve regs
+  push r2
+  push r3
+  copy r0, r8     ; Copy current SSFS pointer into the arguments for B_STRCMP
+  copy r1, r3     ; This was a fix, didn't realise when i added the two copy instructions.
+  call B_STRCMP ; Sets r0
+  pop r3
+  pop r2
+  ; If r0 is 0, then go back to loop because that means the file is not the file we are looking for
+  cmp r0, 0
+  je B_LOAD_FILE.loop
+  clf
+
+  ; if it is 1, then this is the file we are looking for
+  ; Go back 9
+  sub r3, 9
+
+  ; then read the sectors that this file is at
+  ; r3 points to the starting sector if the metadata table is intact
+  ; Read that starting sector
+  mov r2, [r3] ; Put start sector in r2
+  add r3, 4   ; Increment to the length sector (by 4 since its a dword)
+
+  mov r4, [r3] ; Read length sector
+  ; Calculate end sector
+  add r4, r2  ; End sector = Start sector + Sector length - 1 (minus 1 because its not inclusive of end)
+  sub r4, 1
+
+  ; from earlier, r8 is file string address
+  ; r9 is load address
+  jmp B_LOAD_FILE.do_load_loop
+  
+; r2 = Sector
+; r9 = Load address
+B_LOAD_FILE.do_load:
+  ; Read an individual sector, write it at the value in r9
+  copy r0, r2  ; SWI sector  
+  copy r1, r9  ; SWI load address
+  int 0x05    
+  
+  ret
+
+; r2 = starting sector
+; r4 = end sector
+; r9 = load address
+B_LOAD_FILE.do_load_loop:
+  ; Loop through sectors until starting sector = end sector (we increment starting sector)
+  
+  ; Write the sector
+  call B_LOAD_FILE.do_load
+
+  ; Increment the pointers
+  add r2, 1
+  add r9, 1024 ; Sectors are 1024B
+
+  ; If we are above the end sector, then we have finished the load and can return
+  cmp r2, r4 ; if r2 higher than r4
+  jh B_LOAD_FILE.done
+ 
+  ; if not, then continue the loop
+  jmp B_LOAD_FILE.do_load_loop
+
+B_LOAD_FILE.done:
+  ldi r0, 0
+  ret
+
+
+
+B_LOAD_FILE.file_nonexist:
+  ldi r0, 1
+  clf
+  ret
+  
+
+; **B_EARLY_PRINT**
+; *Defined in: 'BOOTSTRAP.x32'*
+; Uses BIOS teletype
+;
+; Register ops:
+;  r0: Pointer to the string
+B_EARLY_PRINT:
+  jmp B_EARLY_PRINT.loop
+
+B_EARLY_PRINT.loop:
+  rb r1, [r0]
+  cmp r1, 0
+  je B_EARLY_PRINT.end
+  push r0
+  copy r0, r1
+  int 0x0E
+  pop r0
+  add r0, 1
+  jmp B_EARLY_PRINT.loop
+  
+
+B_EARLY_PRINT.end:
+  clf 
+  ret
+  
+; **B_EARLY_PRINT**
+; *Defined in: 'BOOTSTRAP.x32'*
+; Uses BIOS teletype
+;
+; Prints a newline.
+B_NEWLINE:
+  ldi r0, '\n'
+  int 0x0E
+  
+  ret  
+
+
+; **B_FILE_EXISTS**
+; *Defined in: 'BOOTSTRAP.x32'*
+;
+; Register ops:
+;  r0: Pointer to the string name of the file
+; Register returns:
+;  r0: 1 = Exists, 0 = Does not
+B_FILE_EXISTS:
+  ldi r3, METADATA_MOUNT_ADDRESS ; r3 = Pointer (VAR)
+  copy r4, r3 
+  add r4, 1024                   ; r4 = Address Terminator (CONST)
+
+  jmp B_FILE_EXISTS.loop
+
+B_FILE_EXISTS.loop:
+  ; If we have hit the end of the metadata, the file was not found.
+  cmp r3, r4
+  je B_FILE_EXISTS.does_not
+
+  ; Read current
+  rb r1, [r3]
+ 
+  ; Increment
+  add r3, 1
+  
+  ; If not a file marker, run it again
+  cmp r1, FILE_ENTRY_MAGIC
+  jne B_FILE_EXISTS.loop
+
+  ; If it is a file marker, increment pointer by 9 and compare the strings against the arg string.
+  ; We increment by 9 to skip over the data we don't need
+  ; We dont increment by 10 because r3 already points to offset 1 
+  add r3, 9
+  ; r0 is preserved accross this routine
+  ; No need to copy anything into a diff register for string A, B_STRCMP already takes r0 as string A
+  ; Only need to copy the address for string B into r1
+  ; We can clobber r2, its not used in this routine either.
+  ; Now, B_STRCMP returns 1 in r0 if the comparison was correct, 0 if not. Which means r0 gets clobbered.
+  ; Simply push it to the stack
+
+  push r0
+  push r3       ; Preserve scratch register r3 as B_STRCMP clobbers it
+  copy r1, r3   ; Current gets clobbered, thats ok. Its only used for magic detection.
+  call B_STRCMP
+  
+  ; Compare not exist
+  cmp r0, 0
+
+  pop r3 ; Get r3 back
+  pop r0 ; Get our string A argument back (fine here because the cmp above compares before we pop)
+  je B_FILE_EXISTS.loop ; Keep doing the loop
+
+  ; If it does exist (r0!=0), then the file exists.
+  jmp B_FILE_EXISTS.does
+
+  
+
+  
+  
+B_FILE_EXISTS.does_not:
+  ldi r0, 0
+  clf
+  ret 
+
+B_FILE_EXISTS.does:
+  ldi r0, 1
+  clf
+  ret
+
+; Compares 2 strings
+; r0 = address of string 1
+; r1 = address of string 2
+; Returns 1 in r0 if both strings terminated at the same time and all letters were the same, 0 if not
+B_STRCMP:
+  jmp B_STRCMP.loop
+
+B_STRCMP.loop:
+  ; Read current bytes
+  rb r2, [r0]
+  rb r3, [r1]
+  
+  ; Compare them
+  cmp r2, r3
+  jne B_STRCMP.wrong ; If not equal, then they are wrong
+  clf
+
+  ; Check for termination of A
+  cmp r2, 0
+  je B_STRCMP.same  ; Go directly to same because if B was not 0, it would have been picked up before
+  clf
+
+  ; Increment pointers
+  add r0, 1
+  add r1, 1
+
+  ; Repeat
+  jmp B_STRCMP.loop
+  
+  
+B_STRCMP.wrong:
+  ldi r0, 0
+  clf
+  ret
+
+B_STRCMP.same:
+  ldi r0, 1
+  clf
+  ret
+  
+
+KERNEL_FILE:
+  db "KERNEL.BIN", 0
+
+KERNEL_N_MSG:
+  db "KERNEL.BIN Missing", 0
+
+
+
+; Pointer tables
+origin 0
+
+region 0x0B800000
+; Base address of video RAM
+VIDEO_MEMORY_ADDRESS_BASE:
+
+region 0x0B800FFF
+; End address of video RAM
+VIDEO_MEMORY_ADDRESS_END:
+
+region 0x0F000000
+; Where sector 4 gets loaded to
+METADATA_MOUNT_ADDRESS:
+
+region 0xFE
+; File entry
+FILE_ENTRY_MAGIC:
+
+region 0xFD
+; File descriptor
+FILE_DESCI_MAGIC:
+
+region 0x00006C00
+; Where the kernel is loaded
+KERNEL_LOAD_ADDRESS:
+
+region 0x0FFFFF00
+; Base address of the stack
+STACK_BASE_ADDRESS:

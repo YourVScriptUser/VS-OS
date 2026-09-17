@@ -1,0 +1,9 @@
+origin 0x00050000
+db 0xCA, 0xFE
+
+ldi r0, msg
+ldi r1, 1
+call sys_kprint
+ret
+
+msg: db "Hello, World!", 0

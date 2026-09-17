@@ -1,0 +1,25 @@
+origin 0x00040000 ; SHELL.BIN loads this file at this address
+ldi r0, dir_msg
+ldi r1, 1
+call sys_kprint
+
+ldi r0, dir_list_addr
+call sys_makefilelist
+ldi r0, dir_list_addr
+ldi r1, 1
+call sys_kprint
+ret
+
+dir_msg:
+  db "sd0:", 10                                      ; Storage Device 0
+  db " fs=ssfs  [1024B/sector] [read-only]", 10      ; Emulator uses 1024 byte sectors and this OS uses the read-only version of the SSFS file system
+  db " size=512 [mb]", 10                            ; Emulator disk is 512MiB
+  db " bios services 0x05, 0x06", 10                 ; 0x05 = disk read, 0x06 = disk write
+  db " ports 0x00, 0xEA, 0xEB, 0xEC"                 ; Ports used by this device
+  
+  db 10, 10
+  db "Files present on sd0:", 10 
+
+  db 0
+
+dir_list_addr:

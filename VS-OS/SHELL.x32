@@ -1,0 +1,159 @@
+origin 0x00030000 ; KERNEL.BIN Loads this file at this address
+; Main VS-OS Shell
+
+ldi r0, SHELL_HEADER
+ldi r1, 1
+call sys_kprint
+
+ldi r0, ENTER_USERNAME_PROMPT
+ldi r1, 0
+call sys_kprint
+call sys_readline
+
+ldi r0, INPUTDATA_ADDRESS
+ldi r1, SHELL_USER
+ldi r2, 96
+call sys_memcpy
+call sys_newline
+call sys_newline
+
+jmp shell_main
+
+shell_main:
+  ; print the username
+  ldi r0, SHELL_USER
+  ; subtract r0 so it includes the color byte we put there with db
+  sub r0, 1
+  ldi r1, 0
+  call sys_kprint
+
+  ; Print the prompt
+  ldi r0, SHELL_PROMPT
+  ldi r1, 0
+  call sys_kprint
+
+  ; Read a single line
+  call sys_readline ; This prints a newline aswell
+  ; Copy the command to our buffer so we aren't interacting with bytes so close to the kernel
+  ldi r0, INPUTDATA_ADDRESS
+  ldi r1, SHELL_CURRENT_COMMAND
+  ldi r2, 96
+  call sys_memcpy
+
+  ; If no command was entered, repeat the loop 
+  ldi r0, SHELL_CURRENT_COMMAND
+  rb r1, [r0]
+  cmp r1, 0
+  je shell_main
+  clf
+
+  ; help
+  ldi r0, SHELL_CURRENT_COMMAND
+  ldi r1, c_help
+  call sys_strcmp
+  cmp r0, 1
+  ldi r0, HELP.BIN
+  je bin_command_do
+
+  ; dir
+  ldi r0, SHELL_CURRENT_COMMAND
+  ldi r1, c_dir
+  call sys_strcmp
+  cmp r0, 1
+  ldi r0, DIR.BIN
+  je bin_command_do
+
+  ; echo
+  ldi r0, SHELL_CURRENT_COMMAND
+  ldi r1, c_echo
+  call sys_strcmp_space
+  cmp r0, 1
+  ldi r0, ECHO.BIN
+  je bin_command_do
+
+  ; run
+  ldi r0, SHELL_CURRENT_COMMAND
+  ldi r1, c_run
+  call sys_strcmp_space
+  cmp r0, 1
+  ldi r0, RUN.BIN
+  je bin_command_do
+
+  ; clear
+  ldi r0, SHELL_CURRENT_COMMAND
+  ldi r1, c_clear
+  call sys_strcmp
+  cmp r0, 1
+  ldi r0, CLEAR.BIN
+  je bin_command_do
+
+  ; If a invalid command was entered, display a message
+  ldi r0, SHELL_INVALID_COMMAND
+  ldi r1, 1
+  call sys_kprint  
+
+  jmp shell_main
+
+; Runs the .bin command file you give it
+;  r0 = Points to the name of the file
+;  Error message when the file is not found (sys_loadfile)
+bin_command_do:
+  clf
+  copy r16, r0 ; Just incase the binary is not found
+  ldi r1, COMMAND_BIN_TASK_LOAD
+  ldi r2, 0
+  call sys_loadfile
+  cmp r0, 1
+  je bin_command_do.b_nf
+
+  call COMMAND_BIN_TASK_LOAD
+  clf
+  jmp shell_main
+
+bin_command_do.b_nf:
+  ; r16 = copy of original r0
+  ldi r0, SHELL_BINARY_LOAD_ERROR
+  ldi r1, 0
+  call sys_kprint
+  copy r0, r16 
+  ldi r1, 1
+  call sys_kprint
+  jmp shell_main
+
+; VSK-32 Video Color bytes:
+;  130: RED
+;  131: GREEN
+;  132: BLUE
+;  133: GREY
+;  134: CYAN
+;  135: BACKGROUND RED
+;  136: RESET
+SHELL_HEADER: db "Welcome to VS-OS", 0
+HELP.BIN: db "HELP.BIN", 0
+CLEAR.BIN: db "CLEAR.BIN", 0
+DIR.BIN: db "DIR.BIN", 0
+RUN.BIN: db "RUN.BIN", 0
+ECHO.BIN: db "ECHO.BIN", 0
+SHELL_INVALID_COMMAND: db "Invalid command", 0
+SHELL_BINARY_LOAD_ERROR: db "ERROR: Command binary not found: ", 0
+c_help: db "help", 0
+c_dir: db "dir", 0
+c_echo: db "echo", 32
+c_run: db "run", 32
+c_clear: db "clear", 0
+SHELL_PROMPT: db 131, "/>", 136, 32, 0
+ENTER_USERNAME_PROMPT: db "Enter username: ", 0
+
+; Current command is stored here
+SHELL_CURRENT_COMMAND:
+  dd 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+
+db 133 ; Color byte for username
+SHELL_USER:
+  dd 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+origin 0
+region 0x00040000
+; Where command .bin files get loaded
+COMMAND_BIN_TASK_LOAD:

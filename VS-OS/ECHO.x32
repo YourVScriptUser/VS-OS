@@ -1,0 +1,9 @@
+origin 0x00040000 ; SHELL.BIN loads this file at this address
+
+ldi r0, SHELL_CURRENT_COMMAND
+
+add r0, 5 ; Skip over 'echo '
+; Print that
+ldi r1, 1
+call sys_kprint
+ret
